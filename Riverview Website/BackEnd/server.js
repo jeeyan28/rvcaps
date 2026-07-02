@@ -15,9 +15,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(cors());
 
-// Serve uploaded facility images at http://<host>:3000/uploads/<filename>
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
 // ── Health check
 app.get("/", (req, res) => {
   res.json({

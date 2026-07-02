@@ -1,7 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const fs = require("fs");
-const path = require("path");
 const Room = require("../model/room");
 const upload = require("../middleware/upload");
 
@@ -11,7 +9,6 @@ function parseFeatures(features) {
   return String(features).split(",").map(f => f.trim()).filter(Boolean);
 }
 
-// ── List all rooms (optionally filter by category or status)
 router.get("/", async (req, res) => {
   try {
     const filter = {};
@@ -26,7 +23,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ── Get a single room
 router.get("/:id", async (req, res) => {
   try {
     const room = await Room.findById(req.params.id);
@@ -38,7 +34,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// ── Create a new room/facility (multipart/form-data — image file optional)
 router.post("/", upload.single("image"), async (req, res) => {
   try {
     const { name, category, roomNumber, capacity, description, price, status, features } = req.body;
@@ -56,7 +51,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       price: Number(price),
       status: status || "Available",
       features: parseFeatures(features),
-      image: req.file ? `/uploads/${req.file.filename}` : (req.body.image || "")
+      image: req.file ? req.file.path : (req.body.image || "")
     });
 
     await room.save();
@@ -67,8 +62,6 @@ router.post("/", upload.single("image"), async (req, res) => {
   }
 });
 
-// ── Update a room/facility (used by Edit Facility modal). Image only changes
-//    if a new file is uploaded — otherwise the existing image is kept.
 router.put("/:id", upload.single("image"), async (req, res) => {
   try {
     const { name, category, roomNumber, capacity, description, price, status, features } = req.body;
@@ -82,21 +75,10 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     if (price !== undefined) update.price = Number(price);
     if (status !== undefined) update.status = status;
     if (features !== undefined) update.features = parseFeatures(features);
-
-    let oldImagePath = null;
-    if (req.file) {
-      const existing = await Room.findById(req.params.id);
-      if (existing && existing.image && existing.image.startsWith("/uploads/")) {
-        oldImagePath = path.join(__dirname, "..", existing.image);
-      }
-      update.image = `/uploads/${req.file.filename}`;
-    }
+    if (req.file) update.image = req.file.path;
 
     const room = await Room.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (!room) return res.status(404).json({ message: "Room not found." });
-
-    // Clean up the old image file now that the new one is confirmed saved
-    if (oldImagePath) fs.unlink(oldImagePath, () => {});
 
     res.json(room);
   } catch (err) {
@@ -105,16 +87,10 @@ router.put("/:id", upload.single("image"), async (req, res) => {
   }
 });
 
-// ── Delete a room/facility (also removes its uploaded image file, if any)
 router.delete("/:id", async (req, res) => {
   try {
     const room = await Room.findByIdAndDelete(req.params.id);
     if (!room) return res.status(404).json({ message: "Room not found." });
-
-    if (room.image && room.image.startsWith("/uploads/")) {
-      fs.unlink(path.join(__dirname, "..", room.image), () => {});
-    }
-
     res.json({ message: "Room deleted." });
   } catch (err) {
     console.error(err);

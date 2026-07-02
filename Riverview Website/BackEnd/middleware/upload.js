@@ -1,30 +1,24 @@
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { v2: cloudinary } = require("cloudinary");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
-// Uploaded facility images are written to BackEnd/uploads and served
-// statically at http://<host>/uploads/<filename> (wired up in server.js)
-const uploadsDir = path.join(__dirname, "..", "uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, unique + path.extname(file.originalname).toLowerCase());
-  }
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "riverview-rooms",
+    allowed_formats: ["png", "jpg", "jpeg"],
+  },
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB, matches the "up to 10MB" note in the UI
-  fileFilter: (req, file, cb) => {
-    if (["image/png", "image/jpeg"].includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only PNG and JPG images are allowed."));
-    }
-  }
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
 module.exports = upload;
